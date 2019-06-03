@@ -61,9 +61,10 @@ def run(args):
     ]
 
     maml = MAML(args, config)
+    maml = maml.cuda() if use_cuda else maml
 
     ds_dl = loadDL('train', args.tasks_num, n_way, k_spt+k_qry )
-    tsds_dl = loadDL('test', args.tasks_num, n_way, k_spt+k_qry)
+    # tsds_dl = loadDL('test', args.tasks_num, n_way, k_spt+k_qry)
 
 
     for epoch in range(args.max_epoch):
@@ -78,17 +79,22 @@ def run(args):
         tsk_ys = torch.stack(tsk_ys, dim=0); tsk_yq = torch.stack(tsk_yq, 0)
         # x = x.cuda() if use_cuda else x
         # y = y.cuda() if use_cuda else y
+        tsk_xs = tsk_xs.cuda() if use_cuda else tsk_xs; tsk_ys = tsk_ys.cuda() if use_cuda else tsk_ys
+        tsk_xq = tsk_xq.cuda() if use_cuda else tsk_xq; tsk_yq = tsk_yq.cuda() if use_cuda else tsk_yq
         accs = maml(tsk_xs,tsk_ys, tsk_xq,tsk_yq)
         print('step:', epoch, ' training accuracy on query set:', accs)
         # if epoch%50==0:
         #     print('step:',epoch,' training accuracy on query set:', accs)
 
-        if epoch%500==0:
+        if epoch%100==0:
             accs = []
             for _ in range(1000//args.tasks_num):
                 for bx, by in ds_dl:
-                    xs = bx[:n_way*k_spt];  xq = bx[n_way*k_spt:]
-                    ys = by[:n_way*k_spt];  yq = by[n_way*k_spt:]
+                    xs = bx[:, :k_spt].contiguous().view(n_way*k_spt, *bx.shape[-3:]);  xq = bx[:, k_spt:].contiguous().view(n_way*k_qry, *bx.shape[-3:])
+                    ys = torch.arange(n_way).view(n_way, 1).expand(n_way, k_spt).contiguous().view(-1, ).long()
+                    yq = torch.arange(n_way).view(n_way, 1).expand(n_way, k_qry).contiguous().view(-1, ).long()
+                    xs = xs.cuda() if use_cuda else xs; ys = ys.cuda() if use_cuda else ys
+                    xq = xq.cuda() if use_cuda else xq; yq = yq.cuda() if use_cuda else yq
                     acc = maml.fine_tuning(xs, ys, xq, yq)
                     accs.append(acc)
 

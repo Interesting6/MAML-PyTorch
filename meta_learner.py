@@ -50,31 +50,23 @@ class MAML(nn.Module):
         tasks_num, xs_sz, ch, h, w = tsk_xs.shape
         xq_sz = tsk_xq.size(1)
 
-        loss_q_list = [0 for _ in range(self.num_update+1)]
-        corr_q_list = deepcopy(loss_q_list)
-
+        corr_q_list = [0 for _ in range(self.num_update)]  # 用来判断在支持集上更新次数对模型准确率的影响
         loss_task = 0
+
         for i in range(tasks_num): # 对于每一个任务
             fast_weights = None
-            for k in range(0, self.num_update-1):
+            for k in range(0, self.num_update):
                 logits_s = self.learner(tsk_xs[i], fast_weights)
                 loss_s = F.cross_entropy(logits_s, tsk_ys[i])
                 grads = torch.autograd.grad(loss_s, self.learner.parameters())
-                fast_weights = list( map(lambda p,g: p-self.update_lr*g,
-                                self.learner.parameters(), grads) )
+                fast_weights = list( map(lambda p,g: p - self.update_lr*g,
+                                    self.learner.parameters(), grads) )
 
                 with torch.no_grad():
                     logits_q = self.learner(tsk_xq[i], fast_weights)
                     pred_q = logits_q.argmax(dim=1)
                     corr_q =  (pred_q == tsk_yq[i]).sum().item()
                     corr_q_list[k] += corr_q
-
-            # 第num_update次
-            logits_s = self.learner(tsk_xs[i], fast_weights)
-            loss_s = F.cross_entropy(logits_s, tsk_ys[i])
-            grads = torch.autograd.grad(loss_s, self.learner.parameters())
-            fast_weights = list(map(lambda p, g: p - self.update_lr * g,
-                                    self.learner.parameters(), grads))
 
             logits_q = self.learner(tsk_xq[i], fast_weights)
             loss_q = F.cross_entropy(logits_q, tsk_yq[i])
@@ -85,7 +77,6 @@ class MAML(nn.Module):
                 pred_q = logits_q.argmax(dim=1)
                 corr_q = (pred_q == tsk_yq[i]).sum().item()
                 corr_q_list[self.num_update-1] += corr_q
-
 
 
         # 所有任务结束
