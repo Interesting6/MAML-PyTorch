@@ -67,7 +67,7 @@ def run(args):
     # tsds_dl = loadDL('test', args.tasks_num, n_way, k_spt+k_qry)
 
 
-    for epoch in range(args.max_epoch):
+    for epoch in range(1, args.max_epoch):
         tsk_xs = []; tsk_xq = []
         tsk_ys = []; tsk_yq = []
         for bx, by in ds_dl:
@@ -118,6 +118,7 @@ if __name__ == '__main__':
     argparser.add_argument('--k_qry', type=int, help='k shot for query set', default=15)
     argparser.add_argument('--imgsz', type=int, help='imgsz', default=28)
     argparser.add_argument('--imgc', type=int, help='imgc', default=1)
+    argparser.add_argument('--update_order', type=int, help='meta update 1st or 2nd derivatives', default=1)
     argparser.add_argument('--meta_lr', type=float, help='meta-level outer learning rate', default=1e-3)
     argparser.add_argument('--update_lr', type=float, help='task-level inner update learning rate', default=0.4)
     argparser.add_argument('--num_update', type=int, help='task-level inner update steps', default=5)
