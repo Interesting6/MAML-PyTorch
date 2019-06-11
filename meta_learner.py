@@ -90,9 +90,9 @@ class MAML(nn.Module):
             logits_q = self.learner(tsk_xq[i], fast_weights)
             loss_q = F.cross_entropy(logits_q, tsk_yq[i])
             if self.order == 2:
-                cum_loss_task += loss_q
+                cum_loss_task += loss_q  # 所有任务累计损失
             else: # order == 1
-                grads_task = torch.autograd.grad(loss_q, fast_weights)
+                grads_task = torch.autograd.grad(loss_q, fast_weights) # 当前任务损失
                 for j in range(self.num_learnable_param):
                     cum_grads_task[j] += grads_task[j]
 
@@ -106,23 +106,21 @@ class MAML(nn.Module):
         # 所有任务结束
         if self.order == 2:
             loss_ = cum_loss_task / tasks_num  # 所有任务上查询集的平均损失
-            self.meta_optim.zero_grad()
             loss_.backward()
             self.meta_optim.step()
-        else:
-            grads = [cum_grads / tasks_num for cum_grads in cum_grads_task] # 所有任务上查询集的平均梯度
             self.meta_optim.zero_grad()
 
-            # with torch.no_grad(): # 手动更新所有参数，但只能普通更新
-            #     for p,g in zip(self.learner.parameters(), grads):
-            #         p.data.add_(-self.meta_lr, g.data)
-
-            for group in self.meta_optim.param_groups:
-                for p,g in zip(group['params'], grads):
-                    if p.grad is not None:
-                        p.grad.data = g.data
-
-            self.meta_optim.step()
+        else:
+            grads = [cum_grads / tasks_num for cum_grads in cum_grads_task] # 所有任务上查询集的平均梯度
+            with torch.no_grad(): # 手动更新所有参数，但只能普通更新
+                for p,g in zip(self.learner.parameters(), grads):
+                    p.data.add_(-self.meta_lr, g.data)
+            # for group in self.meta_optim.param_groups:
+            #     for p,g in zip(group['params'], grads):
+            #         if p.grad is not None:
+            #             p.grad.data = g.data
+            # self.meta_optim.step()
+            self.meta_optim.zero_grad()
 
         accs = np.array(corr_q_list) / (tasks_num*xq_sz)
 
