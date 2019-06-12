@@ -78,7 +78,7 @@ class MAML(nn.Module):
                 loss_s = F.cross_entropy(logits_s, tsk_ys[i])
                 grads = torch.autograd.grad(loss_s, fast_weights)
                 fast_weights = list( map(lambda p,g: p - self.update_lr*g,
-                                    self.learner.parameters(), grads) )
+                                         fast_weights, grads) )
 
                 with torch.no_grad():
                     logits_q = self.learner(tsk_xq[i], fast_weights)
@@ -111,15 +111,15 @@ class MAML(nn.Module):
             self.meta_optim.zero_grad()
 
         else:
-            grads = [cum_grads / tasks_num for cum_grads in cum_grads_task] # 所有任务上查询集的平均梯度
-            with torch.no_grad(): # 手动更新所有参数，但只能普通更新
-                for p,g in zip(self.learner.parameters(), grads):
-                    p.data.add_(-self.meta_lr, g.data)
-            # for group in self.meta_optim.param_groups:
-            #     for p,g in zip(group['params'], grads):
-            #         if p.grad is not None:
-            #             p.grad.data = g.data
-            # self.meta_optim.step()
+            # grads = [cum_grads / tasks_num for cum_grads in cum_grads_task] # 所有任务上查询集的平均梯度
+            # with torch.no_grad(): # 手动更新所有参数，但只能普通更新
+            #     for p,g in zip(self.learner.parameters(), grads):
+            #         p.data.add_(-self.meta_lr, g.data)
+            for group in self.meta_optim.param_groups:
+                for p,g in zip(group['params'], grads):
+                    if p.grad is not None:
+                        p.grad.data = g.data
+            self.meta_optim.step()
             self.meta_optim.zero_grad()
 
         accs = np.array(corr_q_list) / (tasks_num*xq_sz)
