@@ -52,7 +52,7 @@ class MAML(nn.Module):
         tasks_num, xs_sz, ch, h, w = tsk_xs.shape
         xq_sz = tsk_xq.size(1)
 
-        corr_q_list = [0 for _ in range(self.num_update)]  # 用来判断在支持集上更新次数对模型准确率的影响
+        corr_q_list = [0 for _ in range(self.num_update+1)]  # 用来判断在支持集上更新次数对模型准确率的影响
         task_loss = [None for _ in range(self.tasks_num)]
         tasks_grads = [None for _ in range(self.tasks_num)]
         cum_loss_task = 0
@@ -92,15 +92,10 @@ class MAML(nn.Module):
             if self.order == 2:
                 cum_loss_task += loss_q  # 所有任务累计损失
             else: # order == 1
-                grads_task = torch.autograd.grad(loss_q, fast_weights) # 当前任务损失
+                grads_task = torch.autograd.grad(loss_q, fast_weights) # 当前任务损失的梯度，关于参数的列表
                 for j in range(self.num_learnable_param):
                     cum_grads_task[j] += grads_task[j]
 
-            with torch.no_grad():
-                logits_q = self.learner(tsk_xq[i], fast_weights)
-                pred_q = logits_q.argmax(dim=1)
-                corr_q = (pred_q == tsk_yq[i]).sum().item()
-                corr_q_list[self.num_update-1] += corr_q
 
 
         # 所有任务结束
@@ -121,6 +116,13 @@ class MAML(nn.Module):
                         p.grad.data = g.data
             self.meta_optim.step()
             self.meta_optim.zero_grad()
+
+        for i in range(tasks_num): # maml更新后的准确率
+            with torch.no_grad():
+                logits_q = self.learner(tsk_xq[i])
+                pred_q = logits_q.argmax(dim=1)
+                corr_q = (pred_q == tsk_yq[i]).sum().item()
+                corr_q_list[self.num_update] += corr_q
 
         accs = np.array(corr_q_list) / (tasks_num*xq_sz)
 

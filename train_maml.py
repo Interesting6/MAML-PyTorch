@@ -40,24 +40,24 @@ def run(args):
     #     ('linear', [64, args.n_way])
     # ]
     config = [
-        ('conv2d', [3, 64, 3, 3, 1, 1]),
+        ('conv2d', [3, 32, 3, 3, 1, 1]),
         ('relu', [True]),
-        ('bn', [64]),
+        ('bn', [32]),
         ('max_pool2d',[2]),
-        ('conv2d', [64, 64, 3, 3, 1, 1]),
+        ('conv2d', [32, 32, 3, 3, 1, 1]),
         ('relu', [True]),
-        ('bn', [64]),
+        ('bn', [32]),
         ('max_pool2d',[2]),
-        ('conv2d', [64, 64, 3, 3, 1, 1]),
+        ('conv2d', [32, 32, 3, 3, 1, 1]),
         ('relu', [True]),
-        ('bn', [64]),
+        ('bn', [32]),
         ('max_pool2d',[2]),
-        ('conv2d', [64, 64, 2, 2, 1, 1]),
+        ('conv2d', [32, 32, 2, 2, 1, 1]),
         ('relu', [True]),
-        ('bn', [64]),
+        ('bn', [32]),
         ('max_pool2d',[2]),
         ('flatten', []),
-        ('linear', [1600, args.n_way])
+        ('linear', [800, args.n_way])
     ]
 
     maml = MAML(args, config)
