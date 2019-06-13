@@ -106,7 +106,7 @@ class MAML(nn.Module):
             self.meta_optim.zero_grad()
 
         else:
-            # grads = [cum_grads / tasks_num for cum_grads in cum_grads_task] # 所有任务上查询集的平均梯度
+            grads = [cum_grads / tasks_num for cum_grads in cum_grads_task] # 所有任务上查询集的平均梯度
             # with torch.no_grad(): # 手动更新所有参数，但只能普通更新
             #     for p,g in zip(self.learner.parameters(), grads):
             #         p.data.add_(-self.meta_lr, g.data)
