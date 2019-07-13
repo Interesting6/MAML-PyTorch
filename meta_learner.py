@@ -99,11 +99,31 @@ class MAML(nn.Module):
             for p,g in zip(self.learner.parameters(), grads):
                 p.grad = g.clone()
         else:
+<<<<<<< HEAD
             raise ValueError('Order must be either 1 or 2.')
 
         self.meta_optim.step()
         self.meta_optim.zero_grad()
 
+=======
+            grads = [cum_grads / tasks_num for cum_grads in cum_grads_task] # 所有任务上查询集的平均梯度
+            # with torch.no_grad(): # 手动更新所有参数，但只能普通更新
+            #     for p,g in zip(self.learner.parameters(), grads):
+            #         p.data.add_(-self.meta_lr, g.data)
+            for group in self.meta_optim.param_groups:
+                for p,g in zip(group['params'], grads):
+                    if p.grad is not None:
+                        p.grad.data = g.data
+            self.meta_optim.step()
+            self.meta_optim.zero_grad()
+
+        for i in range(tasks_num): # maml更新后的准确率
+            with torch.no_grad():
+                logits_q = self.learner(tsk_xq[i])
+                pred_q = logits_q.argmax(dim=1)
+                corr_q = (pred_q == tsk_yq[i]).sum().item()
+                corr_q_list[self.num_update] += corr_q
+>>>>>>> 41b52a2193cba952a882d6d4c3e90146c5679042
 
         accs = np.array(corr_q_over_update) / (tasks_num*xq_sz)
 
