@@ -66,7 +66,7 @@ def run(args):
     ds_dl = loadDL('train', args.tasks_num, n_way, k_spt+k_qry )
     # tsds_dl = loadDL('test', args.tasks_num, n_way, k_spt+k_qry)
 
-
+    maml.train()
     for epoch in range(1, args.max_epoch):
         tsk_xs = []; tsk_xq = []
         tsk_ys = []; tsk_yq = []
@@ -87,6 +87,7 @@ def run(args):
         #     print('step:',epoch,' training accuracy on query set:', accs)
 
         if epoch%100==0:
+            maml.eval()
             accs = []
             for _ in range(1000//args.tasks_num):
                 for bx, by in ds_dl:
@@ -100,6 +101,7 @@ def run(args):
 
             accs = np.array(accs).mean(axis=0).astype(np.float16)
             print('test accuracy on query set:', accs)
+            maml.train()
 
 
 
@@ -120,7 +122,7 @@ if __name__ == '__main__':
     argparser.add_argument('--imgc', type=int, help='imgc', default=1)
     argparser.add_argument('--update_order', type=int, help='meta update 1st or 2nd derivatives', default=1)
     argparser.add_argument('--meta_lr', type=float, help='meta-level outer learning rate', default=1e-3)
-    argparser.add_argument('--update_lr', type=float, help='task-level inner update learning rate', default=0.4)
+    argparser.add_argument('--update_lr', type=float, help='task-level inner update learning rate', default=0.01)
     argparser.add_argument('--num_update', type=int, help='task-level inner update steps', default=5)
     argparser.add_argument('--test_num_update', type=int, help='update steps for finetunning', default=10)
     argparser.add_argument('--use_cuda', type=int, help='use cuda or not', default=1)
