@@ -63,46 +63,55 @@ def run(args):
     maml = MAML(args, config)
     maml = maml.cuda() if use_cuda else maml
 
-    ds_dl = loadDL('train', args.tasks_num, n_way, k_spt+k_qry )
-    # tsds_dl = loadDL('test', args.tasks_num, n_way, k_spt+k_qry)
+    ds_dl = loadDL('train', args.tasks_num, n_way, (k_spt,k_qry) )
+    tsds_dl = loadDL('test', args.tasks_num, n_way, (k_spt,k_qry) )
+    imgsize = [3, 84, 84]
+    eval_i = 0
 
     maml.train()
     for epoch in range(1, args.max_epoch):
-        tsk_xs = []; tsk_xq = []
-        tsk_ys = []; tsk_yq = []
-        for bx, by in ds_dl:
-            tsk_xs.append(bx[:,:k_spt].contiguous().view( -1, *bx.shape[2:])); tsk_xq.append(bx[:,k_spt:].contiguous().view( -1, *bx.shape[2:]))
-            bys = torch.arange(n_way).view(n_way, 1).expand(n_way, k_spt).contiguous().view( -1, ).long()
-            byq = torch.arange(n_way).view(n_way, 1).expand(n_way, k_qry).contiguous().view(-1, ).long()
-            tsk_ys.append(bys); tsk_yq.append(byq)
-        tsk_xs = torch.stack(tsk_xs, dim=0); tsk_xq = torch.stack(tsk_xq, 0)
-        tsk_ys = torch.stack(tsk_ys, dim=0); tsk_yq = torch.stack(tsk_yq, 0)
-        # x = x.cuda() if use_cuda else x
-        # y = y.cuda() if use_cuda else y
-        tsk_xs = tsk_xs.cuda() if use_cuda else tsk_xs; tsk_ys = tsk_ys.cuda() if use_cuda else tsk_ys
-        tsk_xq = tsk_xq.cuda() if use_cuda else tsk_xq; tsk_yq = tsk_yq.cuda() if use_cuda else tsk_yq
+        all_tasks_batch = list(iter(ds_dl))
+        batchX, batchY = list(zip(*all_tasks_batch))
+        batchX, batchY = [torch.stack(i) for i in (batchX, batchY)]
+        batchX = batchX.cuda() if use_cuda else batchX
+        # batchY = batchY.cuda() if use_cuda else batchY
+
+        tsk_xs = batchX[:,:,:k_spt,].contiguous().view(tasks_num, n_way*k_spt, *imgsize)
+        tsk_xq = batchX[:,:,k_spt:,].contiguous().view(tasks_num, n_way*k_qry, *imgsize)
+        tsk_ys = torch.arange(n_way).view(1,n_way,1).expand(tasks_num, n_way, k_spt).reshape(tasks_num, -1)
+        tsk_yq = torch.arange(n_way).view(1,n_way,1).expand(tasks_num, n_way, k_qry).reshape(tasks_num, -1)
+        tsk_ys = tsk_ys.cuda() if use_cuda else tsk_ys
+        tsk_yq = tsk_yq.cuda() if use_cuda else tsk_yq
         accs = maml(tsk_xs,tsk_ys, tsk_xq,tsk_yq)
         print('step:', epoch, ' training accuracy on query set:', accs)
+        with open('C:/Users/Tream/Desktop/GitHub/MAMLs/MAML-PyTorch/results/outs.txt', 'a', encoding='utf-8') as f:
+            f.write(str(accs)+'\n')
         # if epoch%50==0:
         #     print('step:',epoch,' training accuracy on query set:', accs)
 
+
         if epoch%100==0:
+            eval_i += 1
             maml.eval()
             accs = []
             for _ in range(1000//args.tasks_num):
-                for bx, by in ds_dl:
-                    xs = bx[:, :k_spt].contiguous().view(n_way*k_spt, *bx.shape[-3:]);  xq = bx[:, k_spt:].contiguous().view(n_way*k_qry, *bx.shape[-3:])
-                    ys = torch.arange(n_way).view(n_way, 1).expand(n_way, k_spt).contiguous().view(-1, ).long()
-                    yq = torch.arange(n_way).view(n_way, 1).expand(n_way, k_qry).contiguous().view(-1, ).long()
+                for bx, by in tsds_dl:
+                    xs = bx[:, :k_spt].contiguous().view(n_way*k_spt, *imgsize)
+                    xq = bx[:, k_spt:].contiguous().view(n_way*k_qry, *imgsize)
+                    ys = torch.arange(n_way).view(n_way, 1).expand(n_way, k_spt).reshape(-1)
+                    yq = torch.arange(n_way).view(n_way, 1).expand(n_way, k_qry).reshape(-1)
+
                     xs = xs.cuda() if use_cuda else xs; ys = ys.cuda() if use_cuda else ys
                     xq = xq.cuda() if use_cuda else xq; yq = yq.cuda() if use_cuda else yq
                     acc = maml.fine_tuning(xs, ys, xq, yq)
                     accs.append(acc)
 
-            accs = np.array(accs).mean(axis=0).astype(np.float16)
+            accs = np.array(accs).mean(axis=0).astype('float')
             print('test accuracy on query set:', accs)
+            torch.save(maml.state_dict(), 'C:/Users/Tream/Desktop/GitHub/MAMLs/MAML-PyTorch/saves/mamlImagenet_{}.pt'.format(eval_i))
+            with open('C:/Users/Tream/Desktop/GitHub/MAMLs/MAML-PyTorch/results/outs.txt', 'a', encoding='utf-8') as f:
+                f.write('\n'+str(accs)+'\n')
             maml.train()
-
 
 
 
@@ -113,7 +122,7 @@ def run(args):
 if __name__ == '__main__':
 
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--max_epoch', type=int, help='epoch number', default=40000)
+    argparser.add_argument('--max_epoch', type=int, help='epoch number', default=4000)
     argparser.add_argument('--tasks_num', type=int, help='meta batch size, namely task num', default=32)
     argparser.add_argument('--n_way', type=int, help='n way', default=5)
     argparser.add_argument('--k_spt', type=int, help='k shot for support set', default=1)
